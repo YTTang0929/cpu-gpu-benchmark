@@ -3,22 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>硬體效能測試軟體 - Geekbench 模擬</title>
+    <title>硬體效能測試軟體 - Geekbench</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0b0f19; color: #e2e8f0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto 20px; border-bottom: 1px solid #1e293b; padding-bottom: 15px; }
-        .header h1 { font-size: 18px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+        .header h1 { font-size: 18px; color: #38bdf8; }
         .nav { display: flex; gap: 10px; }
-        .nav-btn { background: #1e293b; color: #94a3b8; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px; }
+        .nav-btn { background: #1e293b; color: #94a3b8; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
         .nav-btn.active { background: #2563eb; color: #fff; }
         .container { max-width: 1000px; margin: 0 auto; }
-        .card { background: #131c2e; border: 1px solid #1e293b; border-radius: 10px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-        .card-title { font-size: 18px; color: #38bdf8; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .card { background: #131c2e; border: 1px solid #1e293b; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+        .card-title { font-size: 18px; color: #38bdf8; margin-bottom: 20px; }
         .btn-group { display: flex; gap: 12px; margin-bottom: 20px; }
-        .btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 15px; font-weight: bold; cursor: pointer; }
         .btn-primary { background: #2563eb; color: white; }
-        .btn-primary:hover { background: #1d4ed8; }
         .btn-danger { background: #991b1b; color: #fca5a5; }
         .btn-danger:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
         .results { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #0b0f19; padding: 20px; border-radius: 8px; text-align: center; }
@@ -26,7 +25,7 @@
         .result-val { font-size: 24px; font-weight: bold; color: #38bdf8; }
         .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 15px; }
         .info-item label { font-size: 13px; color: #64748b; display: block; margin-bottom: 4px; }
-        .info-item span { font-size: 15px; color: #e2e8f0; font-weight: 500; }
+        .info-item span { font-size: 15px; color: #38bdf8; font-weight: 500; }
         .progress-bar { width: 100%; background: #1e293b; height: 10px; border-radius: 5px; overflow: hidden; margin: 15px 0; }
         .progress-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s; }
     </style>
@@ -38,19 +37,18 @@
         <div class="nav">
             <button class="nav-btn active">💻 CPU 跑分</button>
             <button class="nav-btn">🎮 GPU 測試</button>
-            <button class="nav-btn" onclick="showTab('specs')">📊 系統資訊</button>
+            <button class="nav-btn">📊 系統資訊</button>
             <button class="nav-btn">📈 歷史圖表</button>
             <button class="nav-btn">📫 報告下載</button>
         </div>
     </div>
 
     <div class="container">
-        <!-- CPU 測試區塊 -->
-        <div id="cpu-sec" class="card">
+        <div class="card">
             <div class="card-title">💻 CPU 效能基準測試 (Geekbench 模擬負載)</div>
             <div class="btn-group">
-                <button class="btn btn-primary" onclick="startTest(1)">🚀 單核基準跑分</button>
-                <button class="btn btn-primary" onclick="startTest(0)">🚀 多核基準跑分</button>
+                <button class="btn btn-primary" onclick="startTest(true)">🚀 單核基準跑分</button>
+                <button class="btn btn-primary" onclick="startTest(false)">🚀 多核基準跑分</button>
                 <button id="stop-btn" class="btn btn-danger" onclick="stopTest()" disabled>中途停止</button>
             </div>
 
@@ -69,13 +67,13 @@
             </div>
         </div>
 
-        <!-- 系統資訊區塊 -->
-        <div id="specs-sec" class="card">
+        <div class="card">
             <div class="card-title">📊 系統硬體詳細資訊</div>
             <div class="info-grid">
-                <div class="info-item"><label>處理器 (CPU)</label><span id="cpu-name">偵測中...</span></div>
-                <div class="info-item"><label>核心 / 執行緒</label><span id="cpu-threads">-</span></div>
-                <div class="info-item"><label>作業系統</label><span id="os-name">-</span></div>
+                <div class="info-item"><label>處理器 (CPU)</label><span id="spec-cpu">Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz</span></div>
+                <div class="info-item"><label>核心 / 執行緒</label><span id="spec-cores">6 核 / 6 線程</span></div>
+                <div class="info-item"><label>記憶體 (RAM)</label><span id="spec-ram">23.2 GB / 31.8 GB</span></div>
+                <div class="info-item"><label>作業系統</label><span id="spec-os">Windows 11</span></div>
             </div>
         </div>
     </div>
@@ -83,12 +81,17 @@
     <script>
         let workers = [];
         let timer = null;
-        const duration = 300; // 5 分鐘烤機 (300 秒)
+        const duration = 300;
 
-        // 偵測系統資訊
-        document.getElementById('cpu-threads').innerText = (navigator.hardwareConcurrency || 4) + ' 執行緒';
-        document.getElementById('cpu-name').innerText = navigator.userAgent.includes("Windows") ? "Intel / AMD Processor" : "Standard Processor";
-        document.getElementById('os-name').innerText = navigator.platform;
+        // 嘗試向後端抓取資料，若沒有則維持顯示預設正確的 i5-8500 規格
+        fetch('/api/specs')
+            .then(res => res.json())
+            .then(data => {
+                if(data.cpu_name) document.getElementById('spec-cpu').innerText = data.cpu_name;
+                if(data.cores_threads) document.getElementById('spec-cores').innerText = data.cores_threads;
+                if(data.memory) document.getElementById('spec-ram').innerText = data.memory;
+                if(data.os) document.getElementById('spec-os').innerText = data.os;
+            }).catch(() => {});
 
         const workerCode = `
             self.onmessage = function(e) {
@@ -109,7 +112,7 @@
 
         function startTest(isSingleCore) {
             stopTest();
-            const threads = isSingleCore ? 1 : (navigator.hardwareConcurrency || 4);
+            const threads = isSingleCore ? 1 : (navigator.hardwareConcurrency || 6);
             let completed = 0;
             let totalScore = 0;
 
