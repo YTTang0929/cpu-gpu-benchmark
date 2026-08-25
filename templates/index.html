@@ -108,8 +108,8 @@
         <!-- 報告下載 -->
         <div id="tab-report" class="tab-content">
             <div class="card">
-                <div class="card-title">📫 測試報告匯出</div>
-                <button class="btn btn-primary" onclick="alert('報告已生成完畢！')">📄 下載完整硬體報告 (PDF)</button>
+                <div class="card-title">📫 效能測試報告匯出</div>
+                <button class="btn btn-primary" onclick="downloadRealReport()">📄 下載完整測試報告 (.txt)</button>
             </div>
         </div>
     </div>
@@ -134,6 +134,41 @@
                 if(data.memory) document.getElementById('spec-ram').innerText = data.memory;
                 if(data.os) document.getElementById('spec-os').innerText = data.os;
             }).catch(() => {});
+
+        // 真實檔案下載邏輯
+        function downloadRealReport() {
+            const cpu = document.getElementById('spec-cpu').innerText;
+            const cores = document.getElementById('spec-cores').innerText;
+            const ram = document.getElementById('spec-ram').innerText;
+            const os = document.getElementById('spec-os').innerText;
+            const singleScore = document.getElementById('single-score').innerText;
+            const multiScore = document.getElementById('multi-score').innerText;
+            const gpuScore = document.getElementById('gpu-score').innerText;
+
+            const reportText = `========================================
+       硬體效能測試報告 (Geekbench Web)
+========================================
+[系統規格]
+- 處理器 (CPU) : ${cpu}
+- 核心 / 線程  : ${cores}
+- 記憶體 (RAM) : ${ram}
+- 作業系統     : ${os}
+
+[測試成績]
+- CPU 單核得分 : ${singleScore}
+- CPU 多核得分 : ${multiScore}
+- GPU 繪圖得分 : ${gpuScore}
+
+生成時間: ${new Date().toLocaleString('zh-TW')}
+========================================`;
+
+            const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Benchmark_Report_${Date.now()}.txt`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
 
         // 3D 粒子烤機演算法
         let gpuAnimationId = null;
