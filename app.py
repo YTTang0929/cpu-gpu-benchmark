@@ -6,128 +6,141 @@ import concurrent.futures
 import psutil
 import platform
 import json
-import winreg
-import zlib
 
 app = Flask(__name__)
 
-# --- Geekbench 3 大模擬工作負載 ---
-def subtask_compression():
-    """1. 檔案壓縮/解壓縮負載 (Compression)"""
-    data = b"Geekbench Style Benchmark Task Data " * 50000
-    for _ in range(30):
-        compressed = zlib.compress(data)
-        _ = zlib.decompress(compressed)
-
-def subtask_crypto():
-    """2. 加密演算法模擬 (AES/Crypto)"""
-    val = 123456789
-    for _ in range(1500000):
-        val = (val ^ 0x5A5A5A5A) * 1664525 + 1013904223
-        val = val & 0xFFFFFFFF
-
-def subtask_matrix():
-    """3. 矩陣幾何運算 (Matrix Math)"""
-    size = 150
-    m1 = [[i + j for j in range(size)] for i in range(size)]
-    m2 = [[i * j for j in range(size)] for i in range(size)]
-    res = [[0]*size for _ in range(size)]
-    for i in range(size):
-        for j in range(size):
-            res[i][j] = sum(m1[i][k] * m2[k][j] for k in range(size))
-
-def run_geekbench_workload(dummy=None):
-    """執行一次完整的 Geekbench 複合工作負載組合"""
-    subtask_compression()
-    subtask_crypto()
-    subtask_matrix()
-    return True
-
-# --- 讀取正確 CPU 名稱 ---
+# 取得 CPU 名稱（跨平台安全處理）
 def get_clean_cpu_name():
     try:
-        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
-        cpu_name, _ = winreg.QueryValueEx(key, "ProcessorNameString")
-        winreg.CloseKey(key)
-        return cpu_name.strip()
+        if platform.system() == "Windows":
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+            cpu_name, _ = winreg.QueryValueEx(key, "ProcessorNameString")
+            winreg.CloseKey(key)
+            return cpu_name.strip()
+        else:
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if "model name" in line:
+                        return line.split(":")[1].strip()
     except Exception:
-        return platform.processor() or "Standard CPU"
+        pass
+    return platform.processor() or "Cloud vCPU"
+
+def subtask_compression(data_chunk):
+    compressed = []
+    for item in data_chunk:
+        h = 0
+        for ch in str(item):
+            h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+        compressed.append(h)
+    return len(compressed)
+
+def run_geekbench_workload(duration=300):
+    start_time = time.time()
+    total_iterations = 0
+    prime_count = 0
+    crypto_hash = 0
+    compression_count = 0
+
+    chunk_size = 50000
+    dummy_data = list(range(chunk_size))
+
+    while time.time() - start_time < duration:
+        n = 2000
+        for i in range(2, n):
+            is_prime = True
+            for j in range(2, int(math.isqrt(i)) + 1):
+                if i % j == 0:
+                    is_prime = False
+                    break
+            if is_prime:
+                prime_count += 1
+
+        val = total_iterations
+        for _ in range(500):
+            val = ((val * 1103515245 + 12345) & 0x7FFFFFFF)
+        crypto_hash ^= val
+
+        compression_count += subtask_compression(dummy_data)
+        total_iterations += 1
+
+    return {
+        "iterations": total_iterations,
+        "primes": prime_count,
+        "crypto": crypto_hash,
+        "compression": compression_count
+    }
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/api/system_info')
-def system_info():
+@app.route('/api/specs')
+def get_specs():
+    cores = multiprocessing.cpu_count()
+    cpu_name = get_clean_cpu_name()
     return jsonify({
-        'cpu_model': get_clean_cpu_name(),
-        'cpu_cores': psutil.cpu_count(logical=False) or multiprocessing.cpu_count(),
-        'cpu_threads': multiprocessing.cpu_count(),
-        'ram_total': f"{round(psutil.virtual_memory().total / (1024**3), 1)} GB",
-        'ram_available': f"{round(psutil.virtual_memory().available / (1024**3), 1)} GB",
-        'os_system': f"{platform.system()} {platform.release()}"
+        "cpu_name": cpu_name,
+        "cores": cores,
+        "memory_gb": round(psutil.virtual_memory().total / (1024**3), 2)
     })
 
-# 🔥 Geekbench 式：單核基準跑分
-# 🔥 5 分鐘 Geekbench 混合任務單核測試
-@app.route('/api/run-single-stream')
-def run_single_stream():
+@app.route('/api/start_stress')
+def start_stress():
     def generate():
-        target_seconds = 300  # 🎯 鎖定滿滿 300 秒
-        start_time = time.perf_counter()
-        completed_rounds = 0
-        
-        while (time.perf_counter() - start_time) < target_seconds:
-            run_geekbench_workload()  # 輪流執行 壓縮 + 加密 + 矩陣
-            completed_rounds += 1
-            
-        elapsed = time.perf_counter() - start_time
-        # 依據 5 分鐘內完成的總輪數換算分數
-        score = int((completed_rounds / elapsed) * 2000)
-        
-        data = {
-            'status': 'completed',
-            'single_score': score,
-            'single_time': f"{elapsed:.1f} 秒 ({round(elapsed/60, 1)} 分鐘)"
-        }
-        yield f"data: {json.dumps(data)}\n\n"
-        
-    return Response(generate(), mimetype='text/event-stream')
+        cpu_count = multiprocessing.cpu_count()
+        duration = 300  # 5 分鐘測試
 
-# 🔥 5 分鐘 Geekbench 混合任務多核測試
-def run_multi_gb_loop(duration_seconds):
-    start_time = time.perf_counter()
-    rounds = 0
-    while (time.perf_counter() - start_time) < duration_seconds:
-        run_geekbench_workload()
-        rounds += 1
-    return rounds
+        yield f"data: {json.dumps({'status': 'starting', 'message': f'啟動 5 分鐘壓力測試 (全速運作 {cpu_count} 核心)...'})}\n\n"
 
-@app.route('/api/run-multi-stream')
-def run_multi_stream():
-    def generate():
-        target_seconds = 300  # 🎯 鎖定滿滿 300 秒
-        threads = multiprocessing.cpu_count()
-        
-        start_time = time.perf_counter()
-        with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
-            futures = [executor.submit(run_multi_gb_loop, target_seconds) for _ in range(threads)]
-            results = [f.result() for f in concurrent.futures.as_completed(futures)]
+        start_time = time.time()
+        with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count) as executor:
+            futures = [executor.submit(run_geekbench_workload, duration) for _ in range(cpu_count)]
             
-        elapsed = time.perf_counter() - start_time
-        total_rounds = sum(results)
-        
-        multi_score = int((total_rounds / elapsed) * 2000 * 0.85)
-        
-        data = {
+            while True:
+                elapsed = time.time() - start_time
+                remaining = max(0, duration - elapsed)
+                progress = min(100, (elapsed / duration) * 100)
+                
+                cpu_usage = psutil.cpu_percent(interval=None)
+                ram_usage = psutil.virtual_memory().percent
+
+                status_data = {
+                    'status': 'running',
+                    'progress': round(progress, 1),
+                    'elapsed': round(elapsed, 1),
+                    'remaining': round(remaining, 1),
+                    'cpu_usage': cpu_usage,
+                    'ram_usage': ram_usage
+                }
+                yield f"data: {json.dumps(status_data)}\n\n"
+
+                if elapsed >= duration:
+                    break
+                time.sleep(1)
+
+            results = [f.result() for f in futures]
+
+        total_iterations = sum(r['iterations'] for r in results)
+        total_primes = sum(r['primes'] for r in results)
+        total_compression = sum(r['compression'] for r in results)
+
+        score = int((total_iterations * 0.4) + (total_primes * 0.001) + (total_compression * 0.00001))
+
+        final_data = {
             'status': 'completed',
-            'multi_score': multi_score,
-            'multi_time': f"{elapsed:.1f} 秒 ({round(elapsed/60, 1)} 分鐘)"
+            'score': score,
+            'details': {
+                'total_iterations': total_iterations,
+                'total_primes': total_primes,
+                'total_compression': total_compression
+            }
         }
-        yield f"data: {json.dumps(data)}\n\n"
-        
+        yield f"data: {json.dumps(final_data)}\n\n"
+
     return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000)
